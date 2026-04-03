@@ -1,0 +1,148 @@
+/* ── Fade animations ── */
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+.fade-out {
+  animation: fadeOut 0.5s ease forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Layout ── */
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  background: #f0f2fa;
+}
+
+.login-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 60px;
+  background: #f0f2fa;
+}
+
+.login-right {
+  flex: 1;
+  overflow: hidden;
+}
+
+.login-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Logo ── */
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 60px;
+}
+
+.logo-icon {
+  font-size: 20px;
+  color: #3b5bdb;
+}
+
+.logo-text {
+  font-size: 22px;
+  font-weight: 800;
+  color: #3b5bdb;
+  letter-spacing: 1px;
+}
+
+/* ── Card ── */
+.login-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px 36px;
+  max-width: 460px;
+}
+
+.login-tagline {
+  font-size: 28px;
+  font-weight: 700;
+  color: #3b5bdb;
+  line-height: 1.3;
+  margin: 0 0 32px;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 20px;
+}
+
+/* ── Fields ── */
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.login-field label {
+  font-size: 13px;
+  color: #555;
+}
+
+.login-field input {
+  border: 1.5px solid #dde0eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.login-field input:focus {
+  border-color: #3b5bdb;
+}
+
+/* ── Button ── */
+.login-btn {
+  width: 100%;
+  background: #3b5bdb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.login-btn:hover {
+  background: #2f4cc0;
+  transform: translateY(-1px);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Forgot ── */
+.login-forgot {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+}
+
+.login-forgot:hover {
+  color: #3b5bdb;
+  text-decoration: underline;
+}

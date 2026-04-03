@@ -1,0 +1,35 @@
+.main-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 60px;
+  background: #f0f2fa;
+  border-top: 1px solid #e2e5f0;
+  font-size: 13px;
+  color: #9b9eac;
+}
+
+.footer-left {
+  display: flex;
+  gap: 12px;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.footer-right span {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.footer-right span:hover {
+  color: #3b5bdb;
+}
+
+.footer-logo-icon {
+  font-size: 18px;
+  color: #3b5bdb;
+}
