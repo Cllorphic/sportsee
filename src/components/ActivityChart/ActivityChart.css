@@ -5,17 +5,23 @@
   flex-direction: column;
   height: 100%;
 }
+
 .chart-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-start;  /* PeriodNav s'aligne en haut avec le titre */
   margin-bottom: 16px;
+  gap: 12px;
 }
+
 .chart-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
 .activity-title { color: #3b5bdb; }
+.bpm-title { color: #ff3b30; }
+
 .chart-subtitle { color: #9b9eac; font-size: 13px; margin: 0; }
-.chart-date { font-size: 13px; color: #9b9eac; white-space: nowrap; padding-top: 2px; }
+
 .chart-graph { flex: 1; min-height: 220px; }
+
 .chart-legend {
   display: flex;
   align-items: center;
@@ -24,6 +30,7 @@
   font-size: 13px;
   color: #9b9eac;
 }
+
 .dot {
   display: inline-block;
   width: 9px;
@@ -31,6 +38,8 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Tooltip custom */
 .chart-tooltip {
   background: white;
   border: 1px solid #e2e5f0;

@@ -13,7 +13,7 @@ export default function DonutChart({ done = 0, goal = 6 }) {
   return (
     <div className="donut-wrapper">
       <div className="donut-chart-area">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={250}>
           <PieChart>
             <Pie
               data={data}

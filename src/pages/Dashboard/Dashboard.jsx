@@ -4,43 +4,193 @@ import ActivityChart from "../../components/ActivityChart/ActivityChart.jsx";
 import BpmChart from "../../components/BpmChart/BpmChart.jsx";
 import DonutChart from "../../components/DonutChart/DonutChart.jsx";
 import Footer from "../../components/Footer/Footer.jsx";
-import {
-  mockUser,
-  mockStats,
-  DATE_RANGES,
-  DEFAULT_RANGE_ID,
-  weeklyDataByRange,
-  bpmDataByRange,
-  activityByRange,
-  weeklyGoal,
-} from "../../mocks/data";
+import { getUserInfo, getUserActivity } from "../../services/apiService";
 import "./dashboard.css";
 
+const ALL_START = "2025-01-01";
+const ALL_END   = "2029-12-31";
+
+// ─────────────────────────────────────────────────────────────────
+// Avatar avec fallback initiales si l'image ne charge pas
+// ─────────────────────────────────────────────────────────────────
+function ProfileAvatar({ src, firstName, lastName }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = `${(firstName || "?")[0]}${(lastName || "?")[0]}`.toUpperCase();
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={`${firstName} ${lastName}`}
+        className="profile-avatar"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="profile-avatar profile-avatar-fallback"
+      aria-label={`${firstName} ${lastName}`}
+    >
+      {initials}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Génère des périodes de 28 jours glissants depuis les sessions.
+// Retourne : [{ id, label, start, end }]
+// ─────────────────────────────────────────────────────────────────
+function buildPeriods(sessions) {
+  if (!sessions.length) return [];
+
+  const first = new Date(sessions[0].date);
+  const last  = new Date(sessions[sessions.length - 1].date);
+
+  const fmt = (d) =>
+    d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+  const periods = [];
+  let cursor = new Date(first);
+
+  while (cursor <= last) {
+    const start = new Date(cursor);
+    const end   = new Date(cursor);
+    end.setDate(end.getDate() + 27); // fenêtre 28 jours
+
+    periods.push({
+      id:    `${start.toISOString().slice(0, 10)}_${end.toISOString().slice(0, 10)}`,
+      label: `${fmt(start)} – ${fmt(end)}`,
+      start,
+      end,
+    });
+
+    cursor.setDate(cursor.getDate() + 28);
+  }
+
+  return periods;
+}
+
 export default function Dashboard() {
-  const [visible, setVisible] = useState(false);
-  const [selectedRangeId, setSelectedRangeId] = useState(DEFAULT_RANGE_ID);
+  const [visible, setVisible]               = useState(false);
+  const [userInfo, setUserInfo]             = useState(null);
+  const [sessions, setSessions]             = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [selectedPeriodId, setSelectedPeriodId] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 30);
     return () => clearTimeout(t);
   }, []);
 
-  // currentRange est mémorisé : ne se recalcule que si selectedRangeId change
-  const currentRange = useMemo(
-    () => DATE_RANGES.find((r) => r.id === selectedRangeId),
-    [selectedRangeId]
+  useEffect(() => {
+    Promise.all([
+      getUserInfo(),
+      getUserActivity(ALL_START, ALL_END),
+    ])
+      .then(([info, allSessions]) => {
+        setUserInfo(info);
+
+        const sorted = [...allSessions].sort(
+          (a, b) => new Date(a.date) - new Date(b.date)
+        );
+        setSessions(sorted);
+
+        // Période la plus récente sélectionnée par défaut
+        const periods = buildPeriods(sorted);
+        if (periods.length) {
+          setSelectedPeriodId(periods[periods.length - 1].id);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setError("Impossible de charger les données.");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // ── Périodes disponibles ─────────────────────────────────────────
+  const periods = useMemo(() => buildPeriods(sessions), [sessions]);
+
+  // Pour PeriodNav : tableau d'ids + map id → label
+  const periodIds    = useMemo(() => periods.map((p) => p.id), [periods]);
+  const periodLabels = useMemo(
+    () => Object.fromEntries(periods.map((p) => [p.id, p.label])),
+    [periods]
   );
 
-  // Données dérivées de la période — recalculées automatiquement
-  const weeklyData  = weeklyDataByRange[selectedRangeId];
-  const bpmData     = bpmDataByRange[selectedRangeId];
-  const sessions    = activityByRange[selectedRangeId];
+  // ── Sessions de la période sélectionnée ─────────────────────────
+  const periodSessions = useMemo(() => {
+    const period = periods.find((p) => p.id === selectedPeriodId);
+    if (!period) return [];
+    return sessions.filter((s) => {
+      const d = new Date(s.date);
+      return d >= period.start && d <= period.end;
+    });
+  }, [sessions, periods, selectedPeriodId]);
 
-  const sessionsDone = sessions.length;
-  const totalKm      = parseFloat(
-    sessions.reduce((a, s) => a + s.distance, 0).toFixed(1)
+  // ── Km par semaine (période sélectionnée) ────────────────────────
+  // Toujours 4 semaines (S1→S4), avec 0 km si pas de session
+  const weeklyData = useMemo(() => {
+    const period = periods.find((p) => p.id === selectedPeriodId);
+    if (!period) return [];
+
+    // Initialiser les 4 semaines à 0
+    const weeks = {};
+    for (let i = 1; i <= 4; i++) {
+      weeks[`S${i}`] = { week: `S${i}`, km: 0, _n: i };
+    }
+
+    // Remplir avec les sessions de la période
+    periodSessions.forEach((session) => {
+      const diffDays = Math.floor(
+        (new Date(session.date) - period.start) / (1000 * 60 * 60 * 24)
+      );
+      const weekNum = Math.min(Math.floor(diffDays / 7) + 1, 4);
+      const weekKey = `S${weekNum}`;
+      weeks[weekKey].km = parseFloat((weeks[weekKey].km + session.distance).toFixed(1));
+    });
+
+    return Object.values(weeks).sort((a, b) => a._n - b._n);
+  }, [periodSessions, periods, selectedPeriodId]);
+
+  // ── BPM par jour (période sélectionnée) ──────────────────────────
+  const bpmData = useMemo(() => {
+    const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    const byDay = {};
+    periodSessions.forEach((s) => {
+      const day = days[new Date(s.date).getDay()];
+      byDay[day] = {
+        day,
+        min: s.heartRate.min,
+        max: s.heartRate.max,
+        avg: s.heartRate.average,
+      };
+    });
+    return Object.values(byDay);
+  }, [periodSessions]);
+
+  // ── Totaux pour la période sélectionnée (stat-cards + donut) ─────
+  const periodSessionsDone = periodSessions.length;
+  const periodTotalKm = parseFloat(
+    periodSessions.reduce((a, s) => a + s.distance, 0).toFixed(1)
   );
-  const totalMin = sessions.reduce((a, s) => a + s.duration, 0);
+  const periodTotalMin = periodSessions.reduce((a, s) => a + s.duration, 0);
+
+  // ── Rendu ─────────────────────────────────────────────────────────
+  if (loading) {
+    return <div className="app-container"><p style={{ padding: 48 }}>Chargement...</p></div>;
+  }
+  if (error) {
+    return <div className="app-container"><p style={{ padding: 48, color: "red" }}>{error}</p></div>;
+  }
+
+  const { profile, statistics, weeklyGoal } = userInfo;
+
+  // Label de la période sélectionnée pour la section basse
+  const currentPeriodLabel = periodLabels[selectedPeriodId] ?? "";
 
   return (
     <div className="app-container">
@@ -48,100 +198,84 @@ export default function Dashboard() {
 
       <main className={`dashboard ${visible ? "fade-in" : "fade-start"}`}>
 
-        {/* ── Profile banner ── */}
+        {/* ── Bannière profil ── */}
         <div className="profile-banner">
           <div className="profile-info">
-            {/* FIX BUG 6 : profilePicture est maintenant une URL Unsplash valide */}
-            <img
-              src={mockUser.profilePicture}
-              alt={mockUser.firstName}
-              className="profile-avatar"
+            <ProfileAvatar
+              src={profile.profilePicture}
+              firstName={profile.firstName}
+              lastName={profile.lastName}
             />
             <div>
               <h1 className="profile-name">
-                {mockUser.firstName} {mockUser.lastName}
+                {profile.firstName} {profile.lastName}
               </h1>
-              <p className="profile-since">
-                Membre depuis le {mockUser.memberSince}
-              </p>
+              <p className="profile-since">Membre depuis le {profile.createdAt}</p>
             </div>
           </div>
-
           <p className="profile-distance-label">Distance totale parcourue</p>
-
           <div className="distance-badge">
             <span className="distance-icon">🏃</span>
-            {/* FIX BUG 2 : dashboardDistanceKm (312) au lieu de totalDistance (undefined) */}
-            <span className="distance-value">
-              {mockStats.dashboardDistanceKm} km
-            </span>
+            <span className="distance-value">{statistics.totalDistance} km</span>
           </div>
         </div>
 
-        {/* ── Sélecteur de période ── */}
-        <div className="range-selector">
-          {DATE_RANGES.map((range) => (
-            <button
-              key={range.id}
-              className={`range-btn ${selectedRangeId === range.id ? "active" : ""}`}
-              onClick={() => setSelectedRangeId(range.id)}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Charts ── */}
-        <h2 className="section-title">Vos dernières performances</h2>
+        {/* ── Charts avec navigation de période partagée ── */}
+        <h2 className="section-title">Activité par période</h2>
 
         <div className="top-charts">
-          {/* FIX BUG 3 : dateLabel est une PROP → plus de variable module inutilisée */}
           <div className="card">
             <ActivityChart
               data={weeklyData}
-              dateLabel={currentRange.activityLabel}
+              periods={periodIds}
+              periodLabels={periodLabels}
+              selectedPeriod={selectedPeriodId}
+              onPeriodChange={setSelectedPeriodId}
             />
           </div>
           <div className="card">
             <BpmChart
               data={bpmData}
-              dateLabel={currentRange.bpmLabel}
+              periods={periodIds}
+              periodLabels={periodLabels}
+              selectedPeriod={selectedPeriodId}
+              onPeriodChange={setSelectedPeriodId}
             />
           </div>
         </div>
 
-        {/* ── Cette semaine ── */}
+        {/* ── Section période sélectionnée (donut + stats) ── */}
         <section className="week-section">
-          <h2 className="section-title">Cette semaine</h2>
-          {/* FIX BUG 3 : weekLabel vient de la période sélectionnée → plus de hardcode */}
-          <p className="section-subtitle">{currentRange.weekLabel}</p>
+          <h2 className="section-title">Période sélectionnée</h2>
+          <p className="section-subtitle">{currentPeriodLabel}</p>
 
           <div className="bottom-layout">
             <div className="card donut-card">
               <p className="donut-header-text">
-                <span className="donut-count">x{sessionsDone}</span>
+                <span className="donut-count">x{periodSessionsDone}</span>
                 <span className="donut-goal"> sur objectif de {weeklyGoal}</span>
               </p>
-              <p className="donut-sub">Courses hebdomadaires réalisées</p>
-              <DonutChart done={sessionsDone} goal={weeklyGoal} />
+              <p className="donut-sub">Courses réalisées sur la période</p>
+              <DonutChart done={periodSessionsDone} goal={weeklyGoal} />
             </div>
 
             <div className="stats-side">
               <div className="stat-card">
                 <span className="stat-label">Durée d'activité</span>
                 <span className="stat-value blue">
-                  {totalMin}<span className="stat-unit"> minutes</span>
+                  {periodTotalMin}<span className="stat-unit"> min</span>
                 </span>
               </div>
               <div className="stat-card">
                 <span className="stat-label">Distance</span>
                 <span className="stat-value orange">
-                  {totalKm}<span className="stat-unit"> kilomètres</span>
+                  {periodTotalKm}<span className="stat-unit"> km</span>
                 </span>
               </div>
             </div>
           </div>
         </section>
+
       </main>
 
       <Footer />

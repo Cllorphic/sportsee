@@ -1,7 +1,11 @@
+// BpmChart reçoit ses données et sa période via props depuis le Dashboard.
+// Le Dashboard est l'unique owner du state de période (lift state up).
+
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import PeriodNav from "../PeriodNav/PeriodNav.jsx";
 import "./bpmchart.css";
 
 const CustomTooltip = ({ active, payload }) => {
@@ -23,7 +27,19 @@ const CustomTooltip = ({ active, payload }) => {
   return null;
 };
 
-export default function BpmChart({ data = [], dateLabel = "" }) {
+// Props :
+//   data          : [{ day: string, min: number, max: number, avg: number }]
+//   periods       : string[]          — liste des ids de périodes
+//   periodLabels  : { [id]: string }  — map id → label affiché
+//   selectedPeriod: string            — id de la période courante
+//   onPeriodChange: (id) => void      — remonte le changement au Dashboard
+export default function BpmChart({
+  data = [],
+  periods = [],
+  periodLabels = {},
+  selectedPeriod = "",
+  onPeriodChange,
+}) {
   const avgBpm = data.length
     ? Math.round(data.reduce((acc, d) => acc + d.avg, 0) / data.length)
     : 0;
@@ -33,16 +49,25 @@ export default function BpmChart({ data = [], dateLabel = "" }) {
 
   return (
     <div className="chart-card">
+
+      {/* ── En-tête : titre + navigation de période ── */}
       <div className="chart-header">
         <div>
           <h2 className="chart-title bpm-title">{avgBpm} BPM</h2>
           <p className="chart-subtitle">Fréquence cardiaque moyenne</p>
         </div>
-        <span className="chart-date">{dateLabel}</span>
+
+        <PeriodNav
+          periods={periods}
+          periodLabels={periodLabels}
+          value={selectedPeriod}
+          onChange={onPeriodChange}
+        />
       </div>
 
+      {/* ── Graphique ── */}
       <div className="chart-graph">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={250}>
           <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8eaf0" />
             <XAxis
@@ -57,7 +82,10 @@ export default function BpmChart({ data = [], dateLabel = "" }) {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,59,48,0.05)" }} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: "rgba(255,59,48,0.05)" }}
+            />
             <Bar dataKey="min" fill="#F7A9A0" radius={[6, 6, 0, 0]} barSize={22} />
             <Bar dataKey="max" fill="#FF3B30" radius={[6, 6, 0, 0]} barSize={22} />
             <Line
@@ -72,6 +100,7 @@ export default function BpmChart({ data = [], dateLabel = "" }) {
         </ResponsiveContainer>
       </div>
 
+      {/* ── Légende ── */}
       <div className="bpm-legend">
         {[
           { color: "#F7A9A0", label: "Min BPM" },
@@ -84,6 +113,7 @@ export default function BpmChart({ data = [], dateLabel = "" }) {
           </span>
         ))}
       </div>
+
     </div>
   );
 }

@@ -63,7 +63,7 @@
   border-radius: 20px;
   padding: 26px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  min-height: 300px;
 }
 .card:hover { box-shadow: 0 8px 28px rgba(59,91,219,0.12); transform: translateY(-3px); }
 
