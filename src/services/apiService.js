@@ -1,8 +1,17 @@
-// Les appels /api passent par le proxy Vite → http://localhost:8000
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+
+if (USE_MOCK) {
+  console.info("[SportSee] Mode mock activé — les données proviennent de mockService.js");
+}
+
+import * as mockService from "../mocks/Mockservice";
+// ─────────────────────────────────────────────
+// Appels API réels
+// ─────────────────────────────────────────────
 const BASE_URL = "/api";
 
 async function apiFetch(endpoint) {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     headers: {
@@ -12,7 +21,7 @@ async function apiFetch(endpoint) {
   });
 
   if (response.status === 401 || response.status === 403) {
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     window.location.href = "/login";
     return;
   }
@@ -40,8 +49,6 @@ function formatDate(dateStr) {
 // ─────────────────────────────────────────────
 
 function normalizeUserInfo(raw) {
-  // Fusionne les deux sources possibles pour couvrir
-  // les deux formats de réponse du backend
   const info = { ...(raw.userInfos ?? {}), ...(raw.profile ?? {}) };
   const stats = raw.statistics ?? {};
 
@@ -84,14 +91,10 @@ function normalizeActivity(raw) {
 }
 
 // ─────────────────────────────────────────────
-// Exports publics
+// Fonctions API réelles
 // ─────────────────────────────────────────────
 
-/**
- * Login — appel direct au backend (pas via proxy,
- * sinon ça entre en conflit avec la route React /login)
- */
-export async function loginUser(username, password) {
+async function _loginUser(username, password) {
   const response = await fetch("http://localhost:8000/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -102,9 +105,17 @@ export async function loginUser(username, password) {
   return response.json();
 }
 
-export const getUserInfo = () =>
+const _getUserInfo = () =>
   apiFetch("/user-info").then(normalizeUserInfo);
 
-export const getUserActivity = (startWeek, endWeek) =>
+const _getUserActivity = (startWeek, endWeek) =>
   apiFetch(`/user-activity?startWeek=${startWeek}&endWeek=${endWeek}`)
     .then(normalizeActivity);
+
+// ─────────────────────────────────────────────
+// Exports — bascule mock / API selon VITE_USE_MOCK
+// ─────────────────────────────────────────────
+
+export const loginUser       = USE_MOCK ? mockService.loginUser       : _loginUser;
+export const getUserInfo     = USE_MOCK ? mockService.getUserInfo     : _getUserInfo;
+export const getUserActivity = USE_MOCK ? mockService.getUserActivity : _getUserActivity;
